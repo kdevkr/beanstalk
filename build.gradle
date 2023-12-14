@@ -1,0 +1,61 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.0'
+    id 'io.spring.dependency-management' version '1.1.4'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    sourceCompatibility = '17'
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'io.micrometer:micrometer-tracing-bridge-brave'
+    implementation(platform("software.amazon.awssdk:bom:2.21.45"))
+    implementation("software.amazon.awssdk:elasticbeanstalk")
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+tasks.register('procfile') {
+    bootJar.archiveFileName.set('application.jar')
+    dependsOn 'bootJar'
+    doFirst {
+        new File("build/libs", "Procfile").text = "web: java -jar ${bootJar.archiveFileName.get()}"
+    }
+}
+
+tasks.register('zipSourceBundle', Zip) {
+    dependsOn 'clean'
+    dependsOn 'procfile'
+    from('build/libs') {
+        include('application.jar')
+        include('Procfile')
+    }
+    from('beanstalk') {
+        include('.ebextensions/**')
+        include('.platform/nginx/**')
+        include('.platform/hooks/**')
+        include('.platform/confighooks/**')
+    }
+    archiveBaseName = 'beanstalk'
+}
